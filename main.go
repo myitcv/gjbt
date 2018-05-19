@@ -98,7 +98,7 @@ func main() {
 			panic(err)
 		}
 
-		args := []string{"test", "--tags", *fTags, "-c", "-o", tf.Name(), "-v"}
+		args := []string{"test", "--tags", *fTags, "-c", "-o", tf.Name()}
 
 		args = append(args, pkg)
 
@@ -160,7 +160,7 @@ func main() {
 			fmt.Println(ec.Error)
 		}
 		fmt.Printf("%s\t%s\t%.3fs\n", status, bpkg.ImportPath, time.Since(start).Seconds())
-		
+
 		logs, err := p.ReadNewLogs("browser")
 		if err != nil {
 			panic(err)
