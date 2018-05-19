@@ -43,7 +43,6 @@ func main() {
 		agouti.ChromeOptions(
 			"args", []string{
 				"headless",
-				"disable-gpu",
 				"no-default-browser-check",
 				"verbose",
 				"no-sandbox",
