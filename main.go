@@ -156,6 +156,9 @@ func main() {
 			failed = true
 		}
 
+		if ec.Error != "" {
+			fmt.Println(ec.Error)
+		}
 		fmt.Printf("%s\t%s\t%.3fs\n", status, bpkg.ImportPath, time.Since(start).Seconds())
 
 		logs, err := p.ReadNewLogs("browser")
