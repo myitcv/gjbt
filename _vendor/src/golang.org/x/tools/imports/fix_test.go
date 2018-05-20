@@ -6,6 +6,7 @@ package imports
 
 import (
 	"bytes"
+	"context"
 	"flag"
 	"go/build"
 	"io/ioutil"
@@ -909,7 +910,7 @@ func TestFixImports(t *testing.T) {
 	defer func() {
 		findImport = old
 	}()
-	findImport = func(pkgName string, symbols map[string]bool, filename string) (string, bool, error) {
+	findImport = func(_ context.Context, pkgName string, symbols map[string]bool, filename string) (string, bool, error) {
 		return simplePkgs[pkgName], pkgName == "str", nil
 	}
 
@@ -926,6 +927,72 @@ func TestFixImports(t *testing.T) {
 			continue
 		}
 		buf, err := Process(tt.name+".go", []byte(tt.in), options)
+		if err != nil {
+			t.Errorf("error on %q: %v", tt.name, err)
+			continue
+		}
+		if got := string(buf); got != tt.out {
+			t.Errorf("results diff on %q\nGOT:\n%s\nWANT:\n%s\n", tt.name, got, tt.out)
+		}
+	}
+}
+
+func TestProcess_nil_src(t *testing.T) {
+	dir, err := ioutil.TempDir("", "goimports-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	tests := []struct {
+		name    string
+		in, out string
+	}{
+		{
+			name: "nil-src",
+			in: `package foo
+func bar() {
+fmt.Println("hi")
+}
+`,
+			out: `package foo
+
+import "fmt"
+
+func bar() {
+	fmt.Println("hi")
+}
+`,
+		},
+		{
+			name: "missing package",
+			in: `
+func bar() {
+fmt.Println("hi")
+}
+`,
+			out: `
+import "fmt"
+
+func bar() {
+	fmt.Println("hi")
+}
+`,
+		},
+	}
+
+	options := &Options{
+		TabWidth:  8,
+		TabIndent: true,
+		Comments:  true,
+		Fragment:  true,
+	}
+
+	for _, tt := range tests {
+		filename := filepath.Join(dir, tt.name+".go")
+		if err := ioutil.WriteFile(filename, []byte(tt.in), 0666); err != nil {
+			t.Fatal(err)
+		}
+		buf, err := Process(filename, nil, options)
 		if err != nil {
 			t.Errorf("error on %q: %v", tt.name, err)
 			continue
@@ -1119,7 +1186,7 @@ type Buffer2 struct {}
 		}
 		build.Default.GOROOT = goroot
 
-		got, rename, err := findImportGoPath("bytes", map[string]bool{"Buffer2": true}, "x.go")
+		got, rename, err := findImportGoPath(context.Background(), "bytes", map[string]bool{"Buffer2": true}, "x.go")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1127,7 +1194,7 @@ type Buffer2 struct {}
 			t.Errorf(`findImportGoPath("bytes", Buffer2 ...)=%q, %t, want "%s", false`, got, rename, bytesPkgPath)
 		}
 
-		got, rename, err = findImportGoPath("bytes", map[string]bool{"Missing": true}, "x.go")
+		got, rename, err = findImportGoPath(context.Background(), "bytes", map[string]bool{"Missing": true}, "x.go")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1137,34 +1204,23 @@ type Buffer2 struct {}
 	})
 }
 
-func init() {
-	inTests = true
-}
-
 func withEmptyGoPath(fn func()) {
-	testMu.Lock()
-
-	dirScanMu.Lock()
 	populateIgnoreOnce = sync.Once{}
 	scanGoRootOnce = sync.Once{}
 	scanGoPathOnce = sync.Once{}
 	dirScan = nil
 	ignoredDirs = nil
 	scanGoRootDone = make(chan struct{})
-	dirScanMu.Unlock()
 
 	oldGOPATH := build.Default.GOPATH
 	oldGOROOT := build.Default.GOROOT
 	build.Default.GOPATH = ""
 	testHookScanDir = func(string) {}
-	testMu.Unlock()
 
 	defer func() {
-		testMu.Lock()
 		testHookScanDir = func(string) {}
 		build.Default.GOPATH = oldGOPATH
 		build.Default.GOROOT = oldGOROOT
-		testMu.Unlock()
 	}()
 
 	fn()
@@ -1180,7 +1236,7 @@ func TestFindImportInternal(t *testing.T) {
 			t.Skip(err)
 		}
 
-		got, rename, err := findImportGoPath("race", map[string]bool{"Acquire": true}, filepath.Join(runtime.GOROOT(), "src/math/x.go"))
+		got, rename, err := findImportGoPath(context.Background(), "race", map[string]bool{"Acquire": true}, filepath.Join(runtime.GOROOT(), "src/math/x.go"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1189,7 +1245,7 @@ func TestFindImportInternal(t *testing.T) {
 		}
 
 		// should not be able to use internal from outside that tree
-		got, rename, err = findImportGoPath("race", map[string]bool{"Acquire": true}, filepath.Join(runtime.GOROOT(), "x.go"))
+		got, rename, err = findImportGoPath(context.Background(), "race", map[string]bool{"Acquire": true}, filepath.Join(runtime.GOROOT(), "x.go"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1229,7 +1285,7 @@ func TestFindImportRandRead(t *testing.T) {
 			for _, sym := range tt.syms {
 				m[sym] = true
 			}
-			got, _, err := findImportGoPath("rand", m, file)
+			got, _, err := findImportGoPath(context.Background(), "rand", m, file)
 			if err != nil {
 				t.Errorf("for %q: %v", tt.syms, err)
 				continue
@@ -1247,7 +1303,7 @@ func TestFindImportVendor(t *testing.T) {
 			"vendor/golang.org/x/net/http2/hpack/huffman.go": "package hpack\nfunc HuffmanDecode() { }\n",
 		},
 	}.test(t, func(t *goimportTest) {
-		got, rename, err := findImportGoPath("hpack", map[string]bool{"HuffmanDecode": true}, filepath.Join(t.goroot, "src/math/x.go"))
+		got, rename, err := findImportGoPath(context.Background(), "hpack", map[string]bool{"HuffmanDecode": true}, filepath.Join(t.goroot, "src/math/x.go"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1584,8 +1640,8 @@ func TestImportPathToNameGoPathParse(t *testing.T) {
 func TestIgnoreConfiguration(t *testing.T) {
 	testConfig{
 		gopathFiles: map[string]string{
-			".goimportsignore":                                     "# comment line\n\n example.net", // tests comment, blank line, whitespace trimming
-			"example.net/pkg/pkg.go":                               "package pkg\nconst X = 1",
+			".goimportsignore":       "# comment line\n\n example.net", // tests comment, blank line, whitespace trimming
+			"example.net/pkg/pkg.go": "package pkg\nconst X = 1",
 			"otherwise-longer-so-worse.example.net/foo/pkg/pkg.go": "package pkg\nconst X = 1",
 		},
 	}.test(t, func(t *goimportTest) {
