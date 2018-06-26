@@ -26,3 +26,17 @@ func TestFail(t *testing.T) {
 	r.exitCode(1)
 	r.grepBoth("failed for no reason", "failed to find fail output")
 }
+
+func TestEnv(t *testing.T) {
+	r := testRunner(t, "test.004")
+	r.setEnv("BANANA", "banana")
+	r.run()
+	r.exitCode(0)
+}
+
+func TestFlags(t *testing.T) {
+	r := testRunner(t, "test.005")
+	r.run("-v", ".")
+	r.exitCode(0)
+	r.grepBoth("PASS: Test005", "failed to test pass")
+}
