@@ -47,6 +47,8 @@ type testRunnerData struct {
 
 	ran bool
 
+	env []string
+
 	actExitCode int
 	stdout      bytes.Buffer
 	stderr      bytes.Buffer
@@ -56,7 +58,12 @@ func testRunner(t *testing.T, dir string) *testRunnerData {
 	return &testRunnerData{
 		dir: dir,
 		t:   t,
+		env: os.Environ(),
 	}
+}
+
+func (tr *testRunnerData) setEnv(key, value string) {
+	tr.env = append(tr.env, key+"="+value)
 }
 
 func (tr *testRunnerData) run(flagAndArgs ...string) {
@@ -80,6 +87,7 @@ func (tr *testRunnerData) run(flagAndArgs ...string) {
 	cmd.Dir = filepath.Join(dir)
 	cmd.Stdout = &tr.stdout
 	cmd.Stderr = &tr.stderr
+	cmd.Env = tr.env
 
 	var exitCode int
 

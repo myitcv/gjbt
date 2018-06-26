@@ -32,6 +32,16 @@ const (
 var (
 	fTags   = flag.String("tags", "", "tags to pass to the GopherJS compiler")
 	fBinary = flag.String("binary", "", "path to Chrome binary")
+	fEnv    = flag.Bool("env", true, "Pass environment variables to runtime.")
+
+	// Six flags copied almost verbatim from gopherjs.  (They start with a
+	// single '-', like the go test flags.)
+	fBench     = flag.String("bench", "", "Run benchmarks matching the regular expression. By default, no benchmarks run. To run all benchmarks, use '-bench=.'.")
+	fBenchtime = flag.String("benchtime", "", "Run enough iterations of each benchmark to take t, specified as a time.Duration (for example, -benchtime 1h30s). The default is 1 second (1s).")
+	fCount     = flag.String("count", "", "Run each test and benchmark n times (default 1). Examples are always run once.")
+	fRun       = flag.String("run", "", "Run only those tests and examples matching the regular expression.")
+	fShort     = flag.Bool("short", false, "Tell long-running tests to shorten their run time.")
+	fVerbose   = flag.Bool("v", false, "Log all tests as they are run. Also print all text from Log and Logf calls even if the test succeeds.")
 
 	testFailure = errors.New("test failure")
 )
@@ -57,9 +67,10 @@ func handleError(err error) {
 }
 
 type runnerData struct {
-	driver *agouti.WebDriver
-	wd     string
-	tags   string
+	driver    *agouti.WebDriver
+	wd        string
+	tags      string
+	testflags []string
 }
 
 func runChrome() error {
@@ -136,6 +147,24 @@ func runChrome() error {
 		driver: driver,
 		wd:     wd,
 		tags:   *fTags,
+	}
+	if *fBench != "" {
+		runner.testflags = append(runner.testflags, "-test.bench", *fBench)
+	}
+	if *fBenchtime != "" {
+		runner.testflags = append(runner.testflags, "-test.benchtime", *fBenchtime)
+	}
+	if *fCount != "" {
+		runner.testflags = append(runner.testflags, "-test.count", *fCount)
+	}
+	if *fRun != "" {
+		runner.testflags = append(runner.testflags, "-test.run", *fRun)
+	}
+	if *fShort {
+		runner.testflags = append(runner.testflags, "-test.short")
+	}
+	if *fVerbose {
+		runner.testflags = append(runner.testflags, "-test.v")
 	}
 
 	failed := false
@@ -221,7 +250,32 @@ func (r *runnerData) testPkg(pkg string) (bool, error) {
 	status := "ok  "
 	start := time.Now()
 
-	err = p.RunScript(`try {
+	argsValue := append([]string{"/fake/program", "/fake/script.js"}, r.testflags...)
+
+	var envValue = make(map[string]string)
+
+	arguments := make(map[string]interface{})
+	arguments["argv"] = argsValue
+	arguments["env"] = envValue
+
+	if *fEnv {
+		for _, env := range os.Environ() {
+			if index := strings.Index(env, "="); index != -1 {
+				envValue[env[:index]] = env[index+1:]
+			}
+		}
+	}
+
+	// process.exit has to be provided, even if just a no-op, since the
+	// generated gopherjs code checks for the existence of the global process
+	// variable but then assumes the existence of process.exit (same for
+	// process.env).
+	err = p.RunScript(`
+		try {
+			window.process = { };
+			window.process.argv = argv;
+			window.process.env = env;
+			window.process.exit = function(exitcode) {};
 			`+string(test)+`
 		}
 		catch (e) {
@@ -235,7 +289,7 @@ func (r *runnerData) testPkg(pkg string) (bool, error) {
 				ExitCode: window.$GopherJSTestResult
 			}
 		};
-		return window.$GopherJSTestResult`, nil, &ec)
+		return window.$GopherJSTestResult`, arguments, &ec)
 
 	if err != nil {
 		return false, fmtErr("failed to run script: %v")
