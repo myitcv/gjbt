@@ -250,9 +250,7 @@ func (r *runnerData) testPkg(pkg string) (bool, error) {
 	status := "ok  "
 	start := time.Now()
 
-	var argsValue []string
-	argsValue = append(argsValue, "/fake/program", "/fake/script.js")
-	argsValue = append(argsValue, r.testflags...)
+	argsValue := append([]string{"/fake/program", "/fake/script.js"}, r.testflags...)
 
 	var envValue = make(map[string]string)
 
