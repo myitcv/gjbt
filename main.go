@@ -259,7 +259,7 @@ func (r *runnerData) testPkg(pkg string) (bool, error) {
 		}
 		catch (e) {
 			window.$GopherJSTestResult = {
-				Error: e.toString(),
+				Error: e.stack,
 				ExitCode: 1,
 			};
 		};
