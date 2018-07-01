@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -17,6 +18,7 @@ import (
 var gjbt string
 
 func TestMain(m *testing.M) {
+	flag.Parse()
 	td, err := ioutil.TempDir("", "gjbtbin")
 	if err != nil {
 		failf("failed to create gjbt build dir: %v", err)
@@ -77,6 +79,9 @@ func (tr *testRunnerData) run(flagAndArgs ...string) {
 
 	args := []string{"-tags", "js"}
 
+	args = append(args, "-binary", *fBinary)
+	args = append(args, "-driver", *fDriver)
+
 	if len(flagAndArgs) == 0 {
 		args = append(args, ".")
 	} else {
@@ -109,7 +114,7 @@ func (tr *testRunnerData) exitCode(i int) {
 	tr.t.Helper()
 
 	if tr.actExitCode != i {
-		tr.t.Fatalf("exit code; want %v; got %v", i, tr.actExitCode)
+		tr.t.Fatalf("exit code; want %v; got %v\n%s\n%s", i, tr.actExitCode, tr.stdout.String(), tr.stderr.String())
 	}
 }
 

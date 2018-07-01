@@ -32,6 +32,18 @@ matrix:
     - env: CHROMEDRIVER_VERSION=2.38 CHROME_CHANNEL=stable
       addons:
         chrome: stable
+    - env: CHROMEDRIVER_VERSION=2.39 CHROME_CHANNEL=beta
+      addons:
+        chrome: beta
+    - env: CHROMEDRIVER_VERSION=2.39 CHROME_CHANNEL=stable
+      addons:
+        chrome: stable
+    - env: CHROMEDRIVER_VERSION=2.40 CHROME_CHANNEL=beta
+      addons:
+        chrome: beta
+    - env: CHROMEDRIVER_VERSION=2.40 CHROME_CHANNEL=stable
+      addons:
+        chrome: stable
 
 go:
   - 1.10.x
