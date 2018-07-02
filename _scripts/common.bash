@@ -10,7 +10,6 @@ set -o pipefail
 # See https://www.gnu.org/software/bash/manual/html_node/Shell-Functions.html#Shell-Functions
 set -o errtrace
 
-shopt -s globstar
 shopt -s extglob
 
 error() {

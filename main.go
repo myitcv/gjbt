@@ -24,14 +24,10 @@ type res struct {
 	ExitCode int
 }
 
-const (
-	// TODO this doesn't feel so good...
-	chromeBinaryName = "google-chrome"
-)
-
 var (
 	fTags   = flag.String("tags", "", "tags to pass to the GopherJS compiler")
-	fBinary = flag.String("binary", "", "path to Chrome binary")
+	fBinary = flag.String("binary", "google-chrome", "path to Chrome binary")
+	fDriver = flag.String("driver", "chromedriver", "path to chromedriver binary")
 	fEnv    = flag.Bool("env", true, "Pass environment variables to runtime.")
 
 	// Six flags copied almost verbatim from gopherjs.  (They start with a
@@ -82,26 +78,6 @@ func runChrome() error {
 		handleError(fmt.Errorf("failed to get working directory: %v", err))
 	}
 
-	var binary string
-
-	if *fBinary != "" {
-		binary = *fBinary
-	} else {
-		path := os.Getenv("PATH")
-		paths := filepath.SplitList(path)
-		for _, p := range paths {
-			path := filepath.Join(p, chromeBinaryName)
-			if _, err := os.Stat(path); err == nil {
-				binary = path
-				break
-			}
-		}
-
-		if binary == "" {
-			handleError(fmt.Errorf("failed to find google-chrome in your PATH. Either adjust your PATH or using -binary"))
-		}
-	}
-
 	// for each package:
 	//
 	// 1. gopherjs test -c -o /tmp/file
@@ -132,12 +108,15 @@ func runChrome() error {
 		),
 	}
 
+	binaryPath := absPath(*fBinary)
+	driverPath := absPath(*fDriver)
+
 	opts = append(opts,
 		agouti.ChromeOptions(
-			"binary", binary,
+			"binary", binaryPath,
 		))
 
-	driver := agouti.ChromeDriver(opts...)
+	driver := agouti.NewWebDriver("http://{{.Address}}", []string{driverPath, "--port={{.Port}}"}, opts...)
 
 	if err := driver.Start(); err != nil {
 		return fmt.Errorf("failed to start driver: %v", err)
@@ -333,4 +312,20 @@ func (r *runnerData) testPkg(pkg string) (bool, error) {
 	fmt.Printf("%s\t%s\t%.3fs\n", status, bpkg.ImportPath, time.Since(start).Seconds())
 
 	return failed, nil
+}
+
+func absPath(s string) string {
+	if strings.Index(s, string(filepath.Separator)) != -1 {
+		b, err := filepath.Abs(s)
+		if err != nil {
+			handleError(fmt.Errorf("failed to make %v absolute", s))
+		}
+		return b
+	}
+
+	b, err := exec.LookPath(s)
+	if err != nil {
+		handleError(fmt.Errorf("failed to LookPath for %v", s))
+	}
+	return b
 }
