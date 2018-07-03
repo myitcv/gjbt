@@ -46,7 +46,7 @@ matrix:
         chrome: stable
 
 go:
-  - 1.10.x
+  - stable
 
 go_import_path: myitcv.io/gjbt
 
