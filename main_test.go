@@ -40,3 +40,11 @@ func TestFlags(t *testing.T) {
 	r.exitCode(0)
 	r.grepBoth("PASS: Test005", "failed to test pass")
 }
+
+func TestError(t *testing.T) {
+	r := testRunner(t, "test.006")
+	r.run()
+	r.exitCode(1)
+	r.grepBoth("TypeError", "failed to show error class")
+	r.grepBoth("at Test006", "failed to show stack")
+}
