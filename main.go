@@ -26,7 +26,7 @@ type res struct {
 
 var (
 	fTags   = flag.String("tags", "", "tags to pass to the GopherJS compiler")
-	fBinary = flag.String("binary", "google-chrome", "path to Chrome binary")
+	fBinary = flag.String("binary", chromeBinaryName, "path to Chrome binary")
 	fDriver = flag.String("driver", "chromedriver", "path to chromedriver binary")
 	fEnv    = flag.Bool("env", true, "Pass environment variables to runtime.")
 
@@ -325,7 +325,7 @@ func absPath(s string) string {
 
 	b, err := exec.LookPath(s)
 	if err != nil {
-		handleError(fmt.Errorf("failed to LookPath for %v", s))
+		handleError(fmt.Errorf("Failed to find \"%v\" in your PATH environment variable.", s))
 	}
 	return b
 }
